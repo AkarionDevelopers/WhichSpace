@@ -73,6 +73,17 @@
 		A7D1E946AAB54055A5C5F559 /* URLCommandsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 860F2F6428234559874C54BF /* URLCommandsTests.swift */; };
 		E73A40E4FB4441B3A2156727 /* WhichSpace.sdef in Resources */ = {isa = PBXBuildFile; fileRef = B27F1B6A56284EC7A38483EF /* WhichSpace.sdef */; };
 		D2D70ADA82964EB7A70A43FE /* Backup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1583461EC9248878918878E /* Backup.swift */; };
+		9F8815D127628AC7A85C4439 /* GitBranch.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83372BBCEA32426AA924D6C1 /* GitBranch.swift */; };
+		D3ECB01269B5F09B2FDF3684 /* ProjectResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81FC5137B553E481563EC78D /* ProjectResolver.swift */; };
+		ED5D462A2769711C0F2B1E2E /* ProjectIndex.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13AAB2752AB0A83B73CB9E2A /* ProjectIndex.swift */; };
+		7087789E2CB818E25DB71367 /* AgentStatus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 588EBF6886F373174177773B /* AgentStatus.swift */; };
+		E7CC17DC73D5C20B7D958186 /* ClaudeCodeHooks.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB6ECCB1B0B93D046746694A /* ClaudeCodeHooks.swift */; };
+		6282ACC79FB6741846642600 /* ProjectsPane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61804F2B029D86B7F162864C /* ProjectsPane.swift */; };
+		5860A45D0350CAE773A3BA13 /* GitBranchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2C4D0A286E5EB04A14AADB0A /* GitBranchTests.swift */; };
+		A785F19E145A196B03886D7A /* ProjectResolverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B1F2925106FE6EE64535409 /* ProjectResolverTests.swift */; };
+		6C166F99A2F72861189BF67B /* AgentStatusTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6132CD615399967A87BD62E3 /* AgentStatusTests.swift */; };
+		8DFC248D389EB59EF52A9566 /* LabelTemplateTokenTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1F7782D774F76555695B85 /* LabelTemplateTokenTests.swift */; };
+		B6079EE5BDC0E86BEC1D6D63 /* ClaudeCodeHooksTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87A0C7BF3EBB9EBD9CF40457 /* ClaudeCodeHooksTests.swift */; };
 		AD2F9BA0FC424FB6AD1E4A05 /* BackupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 18A849DF0DCE419FA63FF287 /* BackupTests.swift */; };
 		24942840EA374208999A691E /* SettingsModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9B0B15D88D445C8BF528F3 /* SettingsModelTests.swift */; };
 		B28E5ED82D114D24B02542FA /* ClearCellRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 747AE99538E54D6D954CA079 /* ClearCellRulesTests.swift */; };
@@ -131,6 +142,17 @@
 		0621BB91706643C2B80B3FB2 /* SpaceUpdateCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceUpdateCoordinator.swift; sourceTree = "<group>"; };
 		5EB457CA2EEDE8C00021C6BD /* Alerts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Alerts.swift; sourceTree = "<group>"; };
 		E1583461EC9248878918878E /* Backup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Backup.swift; sourceTree = "<group>"; };
+		83372BBCEA32426AA924D6C1 /* GitBranch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitBranch.swift; sourceTree = "<group>"; };
+		81FC5137B553E481563EC78D /* ProjectResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectResolver.swift; sourceTree = "<group>"; };
+		13AAB2752AB0A83B73CB9E2A /* ProjectIndex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectIndex.swift; sourceTree = "<group>"; };
+		588EBF6886F373174177773B /* AgentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatus.swift; sourceTree = "<group>"; };
+		AB6ECCB1B0B93D046746694A /* ClaudeCodeHooks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeHooks.swift; sourceTree = "<group>"; };
+		61804F2B029D86B7F162864C /* ProjectsPane.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsPane.swift; sourceTree = "<group>"; };
+		2C4D0A286E5EB04A14AADB0A /* GitBranchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitBranchTests.swift; sourceTree = "<group>"; };
+		6B1F2925106FE6EE64535409 /* ProjectResolverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectResolverTests.swift; sourceTree = "<group>"; };
+		6132CD615399967A87BD62E3 /* AgentStatusTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentStatusTests.swift; sourceTree = "<group>"; };
+		7E1F7782D774F76555695B85 /* LabelTemplateTokenTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LabelTemplateTokenTests.swift; sourceTree = "<group>"; };
+		87A0C7BF3EBB9EBD9CF40457 /* ClaudeCodeHooksTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCodeHooksTests.swift; sourceTree = "<group>"; };
 		5EB457CB2EEDE8C00021C6BD /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
 		5EB457CC2EEDE8C00021C6BD /* DefaultsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultsStore.swift; sourceTree = "<group>"; };
 		5EB457CD2EEDE8C00021C6BD /* SpaceIconGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceIconGenerator.swift; sourceTree = "<group>"; };
@@ -269,6 +291,11 @@
 				5EB457F22EEDE8C00021C6BD /* SpaceMonitor.swift */,
 				5EB457CA2EEDE8C00021C6BD /* Alerts.swift */,
 				E1583461EC9248878918878E /* Backup.swift */,
+				83372BBCEA32426AA924D6C1 /* GitBranch.swift */,
+				81FC5137B553E481563EC78D /* ProjectResolver.swift */,
+				13AAB2752AB0A83B73CB9E2A /* ProjectIndex.swift */,
+				588EBF6886F373174177773B /* AgentStatus.swift */,
+				AB6ECCB1B0B93D046746694A /* ClaudeCodeHooks.swift */,
 				5EB457CB2EEDE8C00021C6BD /* Constants.swift */,
 				5EB457CC2EEDE8C00021C6BD /* DefaultsStore.swift */,
 				AF09DFE5172F0C9088479C2E /* DisplaySpaceProvider.swift */,
@@ -307,6 +334,11 @@
 		5EB4583F2EEDE9690021C6BD /* Core */ = {
 			isa = PBXGroup;
 			children = (
+				2C4D0A286E5EB04A14AADB0A /* GitBranchTests.swift */,
+				6B1F2925106FE6EE64535409 /* ProjectResolverTests.swift */,
+				6132CD615399967A87BD62E3 /* AgentStatusTests.swift */,
+				7E1F7782D774F76555695B85 /* LabelTemplateTokenTests.swift */,
+				87A0C7BF3EBB9EBD9CF40457 /* ClaudeCodeHooksTests.swift */,
 				18A849DF0DCE419FA63FF287 /* BackupTests.swift */,
 				C010908C363337F4F938B12E /* ErrorRecoveryTests.swift */,
 				BBF87F4927A14FB9AB7B91DB /* ComplexUnicodeTests.swift */,
@@ -331,6 +363,7 @@
 		4E15BE765D6845B591A9C4DE /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				61804F2B029D86B7F162864C /* ProjectsPane.swift */,
 				2C05CF03E51F4C2098379928 /* ClearCellRules.swift */,
 				3704DA229A9A4AD382D4EAE3 /* GeneralPane.swift */,
 				670259493A4A468DA2AEF2F5 /* MenuBarPane.swift */,
@@ -582,6 +615,12 @@
 				5EB457D82EEDE8C00021C6BD /* ItemData.swift in Sources */,
 				5EB457D92EEDE8C00021C6BD /* Alerts.swift in Sources */,
 				D2D70ADA82964EB7A70A43FE /* Backup.swift in Sources */,
+				9F8815D127628AC7A85C4439 /* GitBranch.swift in Sources */,
+				D3ECB01269B5F09B2FDF3684 /* ProjectResolver.swift in Sources */,
+				ED5D462A2769711C0F2B1E2E /* ProjectIndex.swift in Sources */,
+				7087789E2CB818E25DB71367 /* AgentStatus.swift in Sources */,
+				E7CC17DC73D5C20B7D958186 /* ClaudeCodeHooks.swift in Sources */,
+				6282ACC79FB6741846642600 /* ProjectsPane.swift in Sources */,
 				5EB457DC2EEDE8C00021C6BD /* Constants.swift in Sources */,
 				5EB457DE2EEDE8C00021C6BD /* AppDelegate.swift in Sources */,
 				8F5ADAC35A5749F283408953 /* AppMover.swift in Sources */,
@@ -621,6 +660,11 @@
 			buildActionMask = 2147483647;
 			files = (
 				AD2F9BA0FC424FB6AD1E4A05 /* BackupTests.swift in Sources */,
+				5860A45D0350CAE773A3BA13 /* GitBranchTests.swift in Sources */,
+				A785F19E145A196B03886D7A /* ProjectResolverTests.swift in Sources */,
+				6C166F99A2F72861189BF67B /* AgentStatusTests.swift in Sources */,
+				8DFC248D389EB59EF52A9566 /* LabelTemplateTokenTests.swift in Sources */,
+				B6079EE5BDC0E86BEC1D6D63 /* ClaudeCodeHooksTests.swift in Sources */,
 				24942840EA374208999A691E /* SettingsModelTests.swift in Sources */,
 				B28E5ED82D114D24B02542FA /* ClearCellRulesTests.swift in Sources */,
 				9CB829DE946D4BF4B81668D4 /* SpaceEditorModelTests.swift in Sources */,

@@ -267,6 +267,103 @@ struct StatusBarRendererFilterTests {
         #expect(labels == ["1", "2 - Work", "3"])
     }
 
+    // MARK: - Display Presentation
+
+    /// Two displays, each with two Spaces, both showing all Spaces - the shape
+    /// the presentation modes exist to trim down.
+    private func makeTwoDisplayAppState(activeDisplay: String = "Work") -> AppState {
+        stub.activeDisplayIdentifier = activeDisplay
+        stub.displays = [
+            CGSStub.makeDisplay(
+                displayID: "Work",
+                spaces: [(id: 100, isFullscreen: false), (id: 101, isFullscreen: false)],
+                activeSpaceID: 100
+            ),
+            CGSStub.makeDisplay(
+                displayID: "Side",
+                spaces: [(id: 200, isFullscreen: false), (id: 201, isFullscreen: false)],
+                activeSpaceID: 200
+            ),
+        ]
+        store.showAllDisplays = true
+        store.showAllSpaces = true
+        return AppState(displaySpaceProvider: stub, skipObservers: true, store: store)
+    }
+
+    @Test("an unconfigured display renders in full")
+    func presentation_defaultsToFull() {
+        store.spaceLabels = [1: "Alpha"]
+
+        let appState = makeTwoDisplayAppState()
+        let layout = appState.statusBarLayout()
+
+        #expect(layout.slots.map(\.label) == ["Alpha", "2", "Alpha", "4"])
+    }
+
+    @Test("a hidden display contributes no slots")
+    func presentation_hiddenDropsDisplay() {
+        store.displayPresentations = ["Side": .hidden]
+
+        let appState = makeTwoDisplayAppState()
+        let layout = appState.statusBarLayout()
+
+        #expect(layout.slots.map(\.spaceID) == [100, 101])
+    }
+
+    @Test("a numbers-only display drops its custom labels")
+    func presentation_numbersDropsLabels() {
+        // Shared labels apply to both displays by Space index, which is
+        // exactly the echo the numbers mode is meant to silence
+        store.spaceLabels = [1: "Alpha", 2: "Beta"]
+        store.displayPresentations = ["Side": .numbers]
+
+        let appState = makeTwoDisplayAppState()
+        let layout = appState.statusBarLayout()
+
+        #expect(layout.slots.map(\.label) == ["Alpha", "Beta", "3", "4"])
+    }
+
+    @Test("hiding the current display degrades to numbers rather than nothing")
+    func presentation_hiddenCurrentDisplayFallsBackToNumbers() {
+        stub.activeDisplayIdentifier = "Work"
+        stub.displays = [
+            CGSStub.makeDisplay(
+                displayID: "Work",
+                spaces: [(id: 100, isFullscreen: false), (id: 101, isFullscreen: false)],
+                activeSpaceID: 100
+            ),
+        ]
+        store.spaceLabels = [1: "Alpha", 2: "Beta"]
+        store.displayPresentations = ["Work": .hidden]
+        // Every slot here comes from the current display, so there is nothing
+        // left to show if hiding were honoured
+        store.showAllSpaces = true
+
+        let appState = AppState(displaySpaceProvider: stub, skipObservers: true, store: store)
+        let layout = appState.statusBarLayout()
+
+        #expect(layout.slots.map(\.label) == ["1", "2"])
+    }
+
+    @Test("a numbers-only display keeps fullscreen app slots")
+    func presentation_numbersKeepsFullscreenMarker() {
+        stub.activeDisplayIdentifier = "Work"
+        stub.displays = [
+            CGSStub.makeDisplay(
+                displayID: "Work",
+                spaces: [(id: 100, isFullscreen: false), (id: 101, isFullscreen: true)],
+                activeSpaceID: 100
+            ),
+        ]
+        store.showAllSpaces = true
+        store.displayPresentations = ["Work": .numbers]
+
+        let appState = AppState(displaySpaceProvider: stub, skipObservers: true, store: store)
+        let layout = appState.statusBarLayout()
+
+        #expect(layout.slots.map(\.label) == ["1", "F"])
+    }
+
     @Test("label with only {#} template shows space number")
     func labelTemplateOnlySpace() {
         stub.activeDisplayIdentifier = "Main"

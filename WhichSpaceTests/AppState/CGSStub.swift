@@ -10,6 +10,7 @@ final class CGSStub: DisplaySpaceProvider, @unchecked Sendable {
     private var spacesWithWindowsCalls = 0
     private var spacesWithWindowsSemaphore: DispatchSemaphore?
     private var spacesWithWindowsValue: Set<Int> = []
+    private var windowSpacesValue: [UInt32: Int] = [:]
 
     var displays: [NSDictionary] = []
     var activeDisplayIdentifier: String?
@@ -67,6 +68,17 @@ final class CGSStub: DisplaySpaceProvider, @unchecked Sendable {
         }
         blocker?.wait()
         return spaces
+    }
+
+    var windowSpaces: [UInt32: Int] {
+        get { withLock { windowSpacesValue } }
+        set { withLock { windowSpacesValue = newValue } }
+    }
+
+    func spaces(forWindowIDs windowIDs: [UInt32]) -> [UInt32: Int] {
+        withLock {
+            windowSpacesValue.filter { windowIDs.contains($0.key) }
+        }
     }
 
     private func withLock<Result>(_ operation: () -> Result) -> Result {

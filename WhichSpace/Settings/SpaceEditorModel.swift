@@ -85,6 +85,11 @@ final class SpaceEditorModel {
         appState.allDisplaysSpaceInfo
     }
 
+    /// The display's macOS name for the picker, falling back to its position.
+    func displayName(for display: DisplaySpaceInfo, position: Int) -> String {
+        DisplayNames.name(forDisplay: display.displayID, position: position)
+    }
+
     /// Entries of the selected display, as (1-based position, entry) pairs.
     var spaceEntries: [(number: Int, entry: SpaceEntry)] {
         let info = displays.first { $0.displayID == selectedDisplayID }

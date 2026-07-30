@@ -61,8 +61,14 @@ struct Backup: Codable {
 
 /// Global settings that apply to the entire app.
 struct BackupSettings: Codable {
+    var agentStatusIndicator: String?
+    var autoLabelFromProject: Bool
+    var autoLabelTemplate: String
     var clickToSwitchSpaces: Bool
     var dimInactiveSpaces: Bool
+    /// Presentation raw values keyed by display UUID
+    var displayPresentations: [String: String]
+    var editorBundleIDs: [String]
     var emojiPickerSkinTone: Int
     var fullscreenIconStyle: String?
     var hideEmptySpaces: Bool
@@ -74,6 +80,7 @@ struct BackupSettings: Codable {
     var launchAtLogin: Bool
     var localSpaceNumbers: Bool
     var paddingScale: Double?
+    var projectRoots: [String]
     var scrollHapticFeedback: Bool
     var scrollHapticIntensity: Int
     var scrollSensitivity: Double
@@ -87,10 +94,12 @@ struct BackupSettings: Codable {
     var verticalScrollEnabled: Bool
 
     private enum CodingKeys: String, CodingKey {
-        case clickToSwitchSpaces, dimInactiveSpaces, emojiPickerSkinTone, fullscreenIconStyle, hideEmptySpaces
+        case agentStatusIndicator, autoLabelFromProject, autoLabelTemplate
+        case clickToSwitchSpaces, dimInactiveSpaces, displayPresentations
+        case editorBundleIDs, emojiPickerSkinTone, fullscreenIconStyle, hideEmptySpaces
         case hideFullscreenApps, hideSingleSpace, horizontalScrollEnabled
         case invertHorizontalScroll, invertVerticalScroll, launchAtLogin, localSpaceNumbers, paddingScale
-        case scrollHapticFeedback, scrollHapticIntensity, scrollSensitivity, scrollWrapAround
+        case projectRoots, scrollHapticFeedback, scrollHapticIntensity, scrollSensitivity, scrollWrapAround
         case separatorColor, showAllDisplays, showAllSpaces
         case sizeScale, soundName, uniqueIconsPerDisplay
         case verticalScrollEnabled
@@ -99,8 +108,17 @@ struct BackupSettings: Codable {
     /// Tolerates missing keys so backups exported by older app versions still import.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        agentStatusIndicator = try container.decodeIfPresent(String.self, forKey: .agentStatusIndicator)
+        autoLabelFromProject = try container.decodeIfPresent(Bool.self, forKey: .autoLabelFromProject) ?? false
+        autoLabelTemplate = try container.decodeIfPresent(String.self, forKey: .autoLabelTemplate)
+            ?? KeySpecs.autoLabelTemplate.defaultValue
         clickToSwitchSpaces = try container.decodeIfPresent(Bool.self, forKey: .clickToSwitchSpaces) ?? false
         dimInactiveSpaces = try container.decodeIfPresent(Bool.self, forKey: .dimInactiveSpaces) ?? true
+        displayPresentations = try container.decodeIfPresent(
+            [String: String].self, forKey: .displayPresentations
+        ) ?? [:]
+        editorBundleIDs = try container.decodeIfPresent([String].self, forKey: .editorBundleIDs)
+            ?? KeySpecs.editorBundleIDs.defaultValue
         emojiPickerSkinTone = try container.decodeIfPresent(Int.self, forKey: .emojiPickerSkinTone)
             ?? SkinTone.default.rawValue
         fullscreenIconStyle = try container.decodeIfPresent(String.self, forKey: .fullscreenIconStyle)
@@ -113,6 +131,7 @@ struct BackupSettings: Codable {
         launchAtLogin = try container.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? false
         localSpaceNumbers = try container.decodeIfPresent(Bool.self, forKey: .localSpaceNumbers) ?? false
         paddingScale = try container.decodeIfPresent(Double.self, forKey: .paddingScale)
+        projectRoots = try container.decodeIfPresent([String].self, forKey: .projectRoots) ?? []
         scrollHapticFeedback = try container.decodeIfPresent(Bool.self, forKey: .scrollHapticFeedback) ?? false
         scrollHapticIntensity = try container.decodeIfPresent(Int.self, forKey: .scrollHapticIntensity)
             ?? Layout.defaultScrollHapticIntensity
@@ -129,8 +148,13 @@ struct BackupSettings: Codable {
     }
 
     init(
+        agentStatusIndicator: String?,
+        autoLabelFromProject: Bool,
+        autoLabelTemplate: String,
         clickToSwitchSpaces: Bool,
         dimInactiveSpaces: Bool,
+        displayPresentations: [String: String],
+        editorBundleIDs: [String],
         emojiPickerSkinTone: Int,
         fullscreenIconStyle: String?,
         hideEmptySpaces: Bool,
@@ -142,6 +166,7 @@ struct BackupSettings: Codable {
         launchAtLogin: Bool,
         localSpaceNumbers: Bool,
         paddingScale: Double?,
+        projectRoots: [String],
         scrollHapticFeedback: Bool,
         scrollHapticIntensity: Int,
         scrollSensitivity: Double,
@@ -154,8 +179,13 @@ struct BackupSettings: Codable {
         uniqueIconsPerDisplay: Bool,
         verticalScrollEnabled: Bool
     ) {
+        self.agentStatusIndicator = agentStatusIndicator
+        self.autoLabelFromProject = autoLabelFromProject
+        self.autoLabelTemplate = autoLabelTemplate
         self.clickToSwitchSpaces = clickToSwitchSpaces
         self.dimInactiveSpaces = dimInactiveSpaces
+        self.displayPresentations = displayPresentations
+        self.editorBundleIDs = editorBundleIDs
         self.emojiPickerSkinTone = emojiPickerSkinTone
         self.fullscreenIconStyle = fullscreenIconStyle
         self.hideEmptySpaces = hideEmptySpaces
@@ -167,6 +197,7 @@ struct BackupSettings: Codable {
         self.launchAtLogin = launchAtLogin
         self.localSpaceNumbers = localSpaceNumbers
         self.paddingScale = paddingScale
+        self.projectRoots = projectRoots
         self.scrollHapticFeedback = scrollHapticFeedback
         self.scrollHapticIntensity = scrollHapticIntensity
         self.scrollSensitivity = scrollSensitivity
@@ -495,8 +526,13 @@ enum BackupManager {
         }
 
         let settings = BackupSettings(
+            agentStatusIndicator: store.agentStatusIndicator.rawValue,
+            autoLabelFromProject: store.autoLabelFromProject,
+            autoLabelTemplate: store.autoLabelTemplate,
             clickToSwitchSpaces: store.clickToSwitchSpaces,
             dimInactiveSpaces: store.dimInactiveSpaces,
+            displayPresentations: store.displayPresentations.mapValues(\.rawValue),
+            editorBundleIDs: store.editorBundleIDs,
             emojiPickerSkinTone: store.emojiPickerSkinTone.rawValue,
             fullscreenIconStyle: store.fullscreenIconStyle.rawValue,
             hideEmptySpaces: store.hideEmptySpaces,
@@ -508,6 +544,7 @@ enum BackupManager {
             launchAtLogin: launchAtLogin.isEnabled,
             localSpaceNumbers: store.localSpaceNumbers,
             paddingScale: store.paddingScale,
+            projectRoots: store.projectRoots,
             scrollHapticFeedback: store.scrollHapticFeedback,
             scrollHapticIntensity: store.scrollHapticIntensity,
             scrollSensitivity: store.scrollSensitivity,
@@ -625,9 +662,17 @@ enum BackupManager {
         launchAtLogin: LaunchAtLoginProvider = DefaultLaunchAtLoginProvider()
     ) {
         // Apply global settings
+        store.agentStatusIndicator = backup.settings.agentStatusIndicator
+            .flatMap { AgentIndicatorStyle(rawValue: $0) } ?? .dot
+        store.autoLabelFromProject = backup.settings.autoLabelFromProject
+        store.autoLabelTemplate = backup.settings.autoLabelTemplate
         store.clickToSwitchSpaces = backup.settings.clickToSwitchSpaces
         store.dimInactiveSpaces = backup.settings.dimInactiveSpaces
+        store.editorBundleIDs = backup.settings.editorBundleIDs
+        store.projectRoots = backup.settings.projectRoots
         // Unrecognized values (from a newer app version or hand edit) keep the default
+        store.displayPresentations = backup.settings.displayPresentations
+            .compactMapValues { DisplayPresentation(rawValue: $0) }
         store.emojiPickerSkinTone = SkinTone(rawValue: backup.settings.emojiPickerSkinTone) ?? .default
         store.fullscreenIconStyle = backup.settings.fullscreenIconStyle
             .flatMap { FullscreenIconStyle(rawValue: $0) } ?? .appIcon

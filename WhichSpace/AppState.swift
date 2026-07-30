@@ -208,6 +208,19 @@ final class AppState {
         store: store
     )
 
+    /// Maps Spaces to the project/branch of the editor window living on them.
+    /// Dormant (no AX walks, no file watches) until a feature needs it.
+    @ObservationIgnored private(set) lazy var projectIndex: SpaceProjectIndex = .init(
+        displaySpaceProvider: displaySpaceProvider,
+        store: store
+    )
+
+    /// Aggregates coding-agent session state onto Spaces. Dormant until the
+    /// indicator is enabled.
+    @ObservationIgnored private(set) lazy var agentStatusStore: AgentStatusStore = .init(
+        projectIndex: projectIndex
+    )
+
     private var lastUpdateTime: Date = .distantPast
     private var mouseEventMonitor: Any?
     private var notificationTasks: [Task<Void, Never>] = []
@@ -224,6 +237,8 @@ final class AppState {
         configureObservers()
         startSpaceMonitor()
         applySnapshot(buildSnapshot())
+        configureProjectFeatures()
+        updateProjectFeatureActivation()
     }
 
     /// Internal initializer for testing with a custom display space provider
@@ -237,6 +252,10 @@ final class AppState {
             startSpaceMonitor()
         }
         applySnapshot(buildSnapshot())
+        configureProjectFeatures()
+        if !skipObservers {
+            updateProjectFeatureActivation()
+        }
     }
 
     deinit {
@@ -479,6 +498,9 @@ final class AppState {
         snapshot = newSnapshot
         lastUpdateTime = Date()
         renderer.spaceSnapshotDidChange()
+        // Topology changes can move editor windows between Spaces; a dormant
+        // index ignores this
+        projectIndex.scheduleRefresh()
 
         // Real CGS state for the active space has landed - stale switch
         // predictions are now wrong. Topology-only snapshot changes keep
@@ -542,6 +564,38 @@ final class AppState {
         }
 
         NotificationCenter.default.post(name: .currentDisplaySpaceDidChange, object: self)
+    }
+
+    // MARK: - Project Features
+
+    /// Routes project/agent data changes into the renderer so labels and
+    /// status dots follow branch switches and hook events.
+    private func configureProjectFeatures() {
+        projectIndex.onProjectsChanged = { [weak self] in
+            self?.renderer.invalidateIconCache()
+            // Fresh project data can re-attribute existing agent sessions
+            self?.agentStatusStore.scheduleRefresh()
+        }
+        agentStatusStore.onStatesChanged = { [weak self] in
+            self?.renderer.invalidateIconCache()
+        }
+    }
+
+    /// Starts or stops the project index and agent-status watching to match
+    /// the preferences that consume them - both stay fully dormant while
+    /// their features are off. Called on init and on preference changes.
+    func updateProjectFeatureActivation() {
+        let indicatorOn = store.agentStatusIndicator != .off
+        if store.autoLabelFromProject || indicatorOn {
+            projectIndex.start()
+        } else {
+            projectIndex.stop()
+        }
+        if indicatorOn {
+            agentStatusStore.start()
+        } else {
+            agentStatusStore.stop()
+        }
     }
 
     func updateDarkModeStatus() {

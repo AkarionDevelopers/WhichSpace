@@ -186,8 +186,12 @@ struct DefaultsIsolationGuardTests {
     @Test("KeySpecs.allKeyNames matches Defaults.Keys")
     func keySpecsMatchDefaultsKeys() {
         let expectedKeyNames: Set = [
+            "agentStatusIndicator",
+            "autoLabelFromProject",
+            "autoLabelTemplate",
             "clickToSwitchSpaces",
             "dimInactiveSpaces",
+            "displayPresentations",
             "displaySpaceBadges",
             "displaySpaceColors",
             "displaySpaceFonts",
@@ -199,6 +203,7 @@ struct DefaultsIsolationGuardTests {
             "displaySpaceSymbolPositions",
             "displaySpaceSymbols",
             "displaySpaceSymbolWraps",
+            "editorBundleIDs",
             "emojiPickerSkinTone",
             "fullscreenIconStyle",
             "hideEmptySpaces",
@@ -209,6 +214,7 @@ struct DefaultsIsolationGuardTests {
             "invertVerticalScroll",
             "localSpaceNumbers",
             "paddingScale",
+            "projectRoots",
             "scrollHapticFeedback",
             "scrollHapticIntensity",
             "scrollSensitivity",

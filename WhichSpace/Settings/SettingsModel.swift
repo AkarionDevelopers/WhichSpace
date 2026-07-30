@@ -55,6 +55,55 @@ final class SettingsModel {
         return store[keyPath: keyPath]
     }
 
+    // MARK: - Displays
+
+    /// A connected display, identified the way the renderer keys preferences.
+    struct DisplayOption: Identifiable, Equatable {
+        let displayID: String
+        let name: String
+
+        var id: String { displayID }
+    }
+
+    /// Connected displays in physical left-to-right order, so the rows read
+    /// like the desk they describe. Screens whose display UUID is unavailable
+    /// are skipped: without it there is no key to store a preference under.
+    var connectedDisplays: [DisplayOption] {
+        _ = tick
+        let screens = NSScreen.screens.sorted { $0.frame.origin.x < $1.frame.origin.x }
+        return screens.enumerated().compactMap { position, screen in
+            guard let displayID = DisplayNames.uuid(for: screen) else {
+                return nil
+            }
+            return DisplayOption(
+                displayID: displayID,
+                name: DisplayNames.name(forDisplay: displayID, position: position + 1)
+            )
+        }
+    }
+
+    /// A binding for one display's presentation. Writes prune `.full` rather
+    /// than storing it, so the dictionary only ever holds real deviations from
+    /// the default.
+    func presentationBinding(for displayID: String) -> Binding<DisplayPresentation> {
+        Binding(
+            get: { [self] in
+                _ = tick
+                return store.presentation(forDisplay: displayID)
+            },
+            set: { [self] presentation in
+                var presentations = store.displayPresentations
+                if presentation == .full {
+                    presentations.removeValue(forKey: displayID)
+                } else {
+                    presentations[displayID] = presentation
+                }
+                store.displayPresentations = presentations
+                tick += 1
+            }
+        )
+    }
+
     /// `showAllSpaces` and `showAllDisplays` route through their
     /// `SettingsConstraints` setters so any future coupling between the two
     /// keys applies to writes from the panes.

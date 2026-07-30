@@ -12,6 +12,10 @@ extension Settings.PaneIdentifier {
         Self("menuBar")
     }
 
+    static var projects: Self {
+        Self("projects")
+    }
+
     static var spaces: Self {
         Self("spaces")
     }

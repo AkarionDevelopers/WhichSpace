@@ -18,6 +18,21 @@ enum Labels {
 
 // MARK: - Label Templates
 
+/// Data a label template draws on beyond the Space number: the project
+/// resolved onto the Space and its git branch. Absent values make their
+/// tokens resolve to nothing.
+struct LabelContext {
+    var space: Int
+    var branch: String?
+    var project: String?
+
+    init(space: Int, branch: String? = nil, project: String? = nil) {
+        self.space = space
+        self.branch = branch
+        self.project = project
+    }
+}
+
 enum LabelTemplate {
     /// Token replaced with the Space number; shown in placeholders and docs.
     static let spaceToken = "{#}"
@@ -26,26 +41,94 @@ enum LabelTemplate {
     /// shown in the UI, so existing labels keep working.
     static let spaceTokenSynonym = "{number}"
 
+    /// Token replaced with the full git branch of the Space's project.
+    static let branchToken = "{branch}"
+
+    /// Token replaced with the last `/` segment of the branch.
+    static let branchLastToken = "{branch:last}"
+
+    /// Token replaced with the first issue key (`ABC-123`) in the branch.
+    static let ticketToken = "{ticket}"
+
+    /// Token replaced with the Space's project folder name.
+    static let projectToken = "{project}"
+
     private static let spaceTokens = [spaceToken, spaceTokenSynonym]
+
+    /// Every token, for zero-width content counting. Longer tokens first so
+    /// `{branch:last}` is consumed before `{branch}` could match inside it.
+    private static let allTokens = [
+        branchLastToken, branchToken, ticketToken, projectToken,
+    ] + spaceTokens
+
+    /// Matches Jira-style issue keys: an uppercase project code, a dash, digits.
+    /// Computed because `Regex` is not Sendable; construction is cheap.
+    private static var ticketPattern: Regex<Substring> {
+        /[A-Z][A-Z0-9]+-\d+/
+    }
 
     /// Resolves template tokens in a label string.
     /// `{#}` (and its synonym `{number}`) is replaced with the space number.
     static func resolve(_ label: String, space: Int) -> String {
-        spaceTokens.reduce(label) {
-            $0.replacingOccurrences(of: $1, with: String(space))
+        resolve(label, context: LabelContext(space: space))
+    }
+
+    /// Resolves all template tokens. Tokens whose data is unavailable
+    /// resolve to an empty string, so `{ticket}` on a Space without a
+    /// project yields "" and the caller falls back to the Space number.
+    static func resolve(_ label: String, context: LabelContext) -> String {
+        let branch = context.branch ?? ""
+        var resolved = label
+            .replacingOccurrences(of: branchLastToken, with: branchLastSegment(branch))
+            .replacingOccurrences(of: branchToken, with: branch)
+            .replacingOccurrences(of: ticketToken, with: ticket(inBranch: branch) ?? "")
+            .replacingOccurrences(of: projectToken, with: context.project ?? "")
+        resolved = spaceTokens.reduce(resolved) {
+            $0.replacingOccurrences(of: $1, with: String(context.space))
         }
+        return resolved
+    }
+
+    /// The last `/`-separated segment of a branch name.
+    private static func branchLastSegment(_ branch: String) -> String {
+        branch.components(separatedBy: "/").last ?? branch
+    }
+
+    /// The first issue key in a branch name, e.g. "DEV-8585" out of
+    /// "task/DEV-8585/bu".
+    static func ticket(inBranch branch: String) -> String? {
+        guard let match = branch.firstMatch(of: ticketPattern) else {
+            return nil
+        }
+        return String(match.output)
     }
 
     /// Maximum label content length, excluding template tokens.
     /// Shared by the menu input field and the AppleScript setter.
     static let maxContentLength = 20
 
+    /// Maximum length of a fully resolved label. Branch names routinely
+    /// exceed the authoring limit, so resolved output is capped separately
+    /// by the renderer.
+    static let maxResolvedLength = 24
+
     /// Returns the content length of a label, excluding template tokens.
     /// Used for character limit validation in the input field.
     static func contentLength(_ label: String) -> Int {
-        spaceTokens.reduce(label) {
+        allTokens.reduce(label) {
             $0.replacingOccurrences(of: $1, with: "")
         }.count
+    }
+
+    /// Caps a fully resolved label, appending "…" when trimming occurred.
+    /// Unlike `truncate` this counts every character - there are no tokens
+    /// left after resolution.
+    static func truncateResolved(_ label: String) -> String {
+        guard label.count > maxResolvedLength else {
+            return label
+        }
+        return label.prefix(maxResolvedLength - 1)
+            .trimmingCharacters(in: .whitespaces) + "…"
     }
 
     /// Truncates a label so its content length fits `maxContentLength`,
@@ -205,6 +288,7 @@ enum IconColors {
 // MARK: - Localization
 
 enum Localization {
+    static let actionAddFolder = String(localized: "action_add_folder")
     static let actionCopyTo = String(localized: "action_copy_to")
     static let actionCheckForUpdates = String(localized: "action_check_for_updates")
     static let actionExportSettings = String(localized: "action_export_settings")
@@ -215,7 +299,12 @@ enum Localization {
     static let actionReset = String(localized: "action_reset")
     static let actionResetAllSpaces = String(localized: "action_reset_all_spaces")
     static let actionResetCurrentSpace = String(localized: "action_reset_current_space")
+    static let actionInstallHooks = String(localized: "action_install_hooks")
+    static let actionRemoveHooks = String(localized: "action_remove_hooks")
     static let actionSetAsDefault = String(localized: "action_set_as_default")
+    static let agentStateDone = String(localized: "agent_state_done")
+    static let agentStateWaiting = String(localized: "agent_state_waiting")
+    static let agentStateWorking = String(localized: "agent_state_working")
     static let alertAccessibilityDetail = String(localized: "alert_accessibility_detail")
     static let alertAccessibilityRequired = String(localized: "alert_accessibility_required")
     static let alertCustomSoundsDetail = String(localized: "alert_custom_sounds_detail")
@@ -235,11 +324,15 @@ enum Localization {
     static let buttonSwap = String(localized: "button_swap")
     static let confirmCopyToAllDisplays = String(localized: "confirm_copy_to_all_displays")
     static let confirmCopyToThisDisplay = String(localized: "confirm_copy_to_this_display")
+    static let confirmInstallHooks = String(localized: "confirm_install_hooks")
+    static let confirmRemoveHooks = String(localized: "confirm_remove_hooks")
     static let confirmSetDefaultStyle = String(localized: "confirm_set_default_style")
     static let confirmResetAllSpaces = String(localized: "confirm_reset_all_spaces")
     static let confirmResetDefault = String(localized: "confirm_reset_default")
     static let confirmResetSpace = String(localized: "confirm_reset_space")
     static let detailCopyToAllDisplays = String(localized: "detail_copy_to_all_displays")
+    static let detailInstallHooks = String(localized: "detail_install_hooks")
+    static let detailRemoveHooks = String(localized: "detail_remove_hooks")
     static let detailCopyToThisDisplay = String(localized: "detail_copy_to_this_display")
     static let detailSetDefaultStyle = String(localized: "detail_set_default_style")
     static let detailResetAllSpaces = String(localized: "detail_reset_all_spaces")
@@ -265,6 +358,8 @@ enum Localization {
     static let labelDefault = String(localized: "label_default")
     static let labelDefaultStyle = String(localized: "label_default_style")
     static let labelDesktopNumber = String(localized: "label_desktop_number")
+    static let labelDetectedProjects = String(localized: "label_detected_projects")
+    static let labelDisplayNumber = String(localized: "label_display_number")
     static let labelDisplays = String(localized: "label_displays")
     static let labelFont = String(localized: "label_font")
     static let labelGlyph = String(localized: "label_glyph")
@@ -275,16 +370,20 @@ enum Localization {
     static let labelHapticStrong = String(localized: "label_haptic_strong")
     static let labelHapticVeryLight = String(localized: "label_haptic_very_light")
     static let labelHapticVeryStrong = String(localized: "label_haptic_very_strong")
+    static let labelHooks = String(localized: "label_hooks")
     static let labelHorizontal = String(localized: "label_horizontal")
     static let labelInside = String(localized: "label_inside")
     static let labelLabelBackground = String(localized: "label_label_background")
     static let labelLabelForeground = String(localized: "label_label_foreground")
+    static let labelLabelTemplate = String(localized: "label_label_template")
     static let labelLeft = String(localized: "label_left")
+    static let labelNoProjects = String(localized: "label_no_projects")
     static let labelNumber = String(localized: "label_number")
     static let labelNumberBackground = String(localized: "label_number_background")
     static let labelNumberForeground = String(localized: "label_number_foreground")
     static let labelOutside = String(localized: "label_outside")
     static let labelPreview = String(localized: "label_preview")
+    static let labelProjectRoots = String(localized: "label_project_roots")
     static let labelRight = String(localized: "label_right")
     static let labelSensitivity = String(localized: "label_sensitivity")
     static let labelSeparator = String(localized: "label_separator")
@@ -312,11 +411,17 @@ enum Localization {
     static let menuSymbol = String(localized: "menu_symbol")
     static let paneGeneral = String(localized: "pane_general")
     static let paneMenuBar = String(localized: "pane_menu_bar")
+    static let paneProjects = String(localized: "pane_projects")
     static let paneSpaces = String(localized: "pane_spaces")
     static let paneSwitching = String(localized: "pane_switching")
     static let search = String(localized: "search")
+    static let statusHooksInstalled = String(localized: "status_hooks_installed")
+    static let statusHooksNotInstalled = String(localized: "status_hooks_not_installed")
+    static let statusHooksPartial = String(localized: "status_hooks_partial")
     static let soundCustom = String(localized: "sound_custom")
     static let soundNone = String(localized: "sound_none")
+    static let tipAgentStatus = String(localized: "tip_agent_status")
+    static let tipAutoLabel = String(localized: "tip_auto_label")
     static let tipCopyTo = String(localized: "tip_copy_to")
     static let tipBackup = String(localized: "tip_backup")
     static let tipBadgeInput = String(localized: "tip_badge_input")
@@ -326,8 +431,12 @@ enum Localization {
     static let tipClearLabel = String(localized: "tip_clear_label")
     static let tipClickToSwitchSpaces = String(localized: "tip_click_to_switch_spaces")
     static let tipDimInactiveSpaces = String(localized: "tip_dim_inactive_spaces")
+    static let tipDisplayPresentation = String(localized: "tip_display_presentation")
     static let tipFont = String(localized: "tip_font")
     static let tipHideEmptySpaces = String(localized: "tip_hide_empty_spaces")
+    static let tipHooks = String(localized: "tip_hooks")
+    static let tipLabelTemplate = String(localized: "tip_label_template")
+    static let tipProjectRoots = String(localized: "tip_project_roots")
     static let tipHideFullscreenApps = String(localized: "tip_hide_fullscreen_apps")
     static let tipHideSingleSpace = String(localized: "tip_hide_single_space")
     static let tipInvertColors = String(localized: "tip_invert_colors")
@@ -348,7 +457,9 @@ enum Localization {
     static let tipSound = String(localized: "tip_sound")
     static let tipUniqueIconsPerDisplay = String(localized: "tip_unique_icons_per_display")
     static let tipUseFForFullscreenApps = String(localized: "tip_use_f_for_fullscreen_apps")
+    static let toggleAgentStatus = String(localized: "toggle_agent_status")
     static let toggleAutoCheckUpdates = String(localized: "toggle_auto_check_updates")
+    static let toggleAutoLabel = String(localized: "toggle_auto_label")
     static let toggleAutoInstallUpdates = String(localized: "toggle_auto_install_updates")
     static let toggleClickToSwitchSpaces = String(localized: "toggle_click_to_switch_spaces")
     static let toggleDimInactiveSpaces = String(localized: "toggle_dim_inactive_spaces")

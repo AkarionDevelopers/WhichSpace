@@ -186,9 +186,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverD
                     self?.scrollHapticAction(intensity)
                 }
             })
+            let projectsPane = Settings.PaneHostingController(pane: Settings.Pane(
+                identifier: .projects,
+                title: Localization.paneProjects,
+                toolbarIcon: NSImage(systemSymbolName: "arrow.triangle.branch", accessibilityDescription: nil)!
+            ) { [appState] in
+                ProjectsPane(model: model, appState: appState)
+            })
             settingsCoordinator = SettingsWindowCoordinator(
                 models: [model, editorModel],
-                panes: [generalPane, spacesPane, switchingPane, menuBarPane]
+                panes: [generalPane, spacesPane, switchingPane, menuBarPane, projectsPane]
             )
         }
         settingsCoordinator?.show()
@@ -375,6 +382,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, SPUStandardUserDriverD
                 // Covers defaults changes that bypass DefaultsStore (and its mutation
                 // counter), e.g. external `defaults write`
                 self?.store.invalidateCachedValues()
+                // Auto-labelling and the agent indicator start/stop their
+                // backing services with their preference
+                self?.appState.updateProjectFeatureActivation()
                 self?.appState.renderer.invalidateIconCache()
                 self?.updateStatusBarIcon()
             }

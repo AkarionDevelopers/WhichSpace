@@ -34,8 +34,18 @@ extension TypedKeySpec: AnyKeySpec {
 /// 2. Add the corresponding property in `DefaultsStore`
 /// 3. Tests will automatically pick up the new key
 enum KeySpecs {
+    static let agentStatusIndicator = TypedKeySpec(
+        name: "agentStatusIndicator",
+        defaultValue: AgentIndicatorStyle.dot
+    )
+    static let autoLabelFromProject = TypedKeySpec(name: "autoLabelFromProject", defaultValue: false)
+    static let autoLabelTemplate = TypedKeySpec(name: "autoLabelTemplate", defaultValue: "{ticket}")
     static let clickToSwitchSpaces = TypedKeySpec(name: "clickToSwitchSpaces", defaultValue: false)
     static let dimInactiveSpaces = TypedKeySpec(name: "dimInactiveSpaces", defaultValue: true)
+    static let displayPresentations = TypedKeySpec(
+        name: "displayPresentations",
+        defaultValue: [String: DisplayPresentation]()
+    )
     static let displaySpaceBadges = TypedKeySpec(
         name: "displaySpaceBadges",
         defaultValue: [String: [Int: SpaceBadge]]()
@@ -80,6 +90,15 @@ enum KeySpecs {
         name: "displaySpaceSymbolWraps",
         defaultValue: [String: [Int: SymbolWrap]]()
     )
+    static let editorBundleIDs = TypedKeySpec(
+        name: "editorBundleIDs",
+        defaultValue: [
+            "com.microsoft.VSCode",
+            "com.microsoft.VSCodeInsiders",
+            "com.todesktop.230313mzl4w4u92", // Cursor
+            "com.vscodium",
+        ]
+    )
     static let emojiPickerSkinTone = TypedKeySpec(name: "emojiPickerSkinTone", defaultValue: SkinTone.default)
     static let fullscreenIconStyle = TypedKeySpec(
         name: "fullscreenIconStyle",
@@ -89,6 +108,7 @@ enum KeySpecs {
     static let invertHorizontalScroll = TypedKeySpec(name: "invertHorizontalScroll", defaultValue: false)
     static let invertVerticalScroll = TypedKeySpec(name: "invertVerticalScroll", defaultValue: false)
     static let paddingScale = TypedKeySpec(name: "paddingScale", defaultValue: Layout.defaultPaddingScale)
+    static let projectRoots = TypedKeySpec(name: "projectRoots", defaultValue: [String]())
     static let hideEmptySpaces = TypedKeySpec(name: "hideEmptySpaces", defaultValue: false)
     static let hideFullscreenApps = TypedKeySpec(name: "hideFullscreenApps", defaultValue: false)
     static let hideSingleSpace = TypedKeySpec(name: "hideSingleSpace", defaultValue: false)
@@ -132,8 +152,12 @@ enum KeySpecs {
     /// observation all derive from it, so a new key only needs an entry
     /// here and a `DefaultsStore` accessor.
     static let allSpecs: [any AnyKeySpec] = [
+        agentStatusIndicator,
+        autoLabelFromProject,
+        autoLabelTemplate,
         clickToSwitchSpaces,
         dimInactiveSpaces,
+        displayPresentations,
         displaySpaceBadges,
         displaySpaceColors,
         displaySpaceFonts,
@@ -145,6 +169,7 @@ enum KeySpecs {
         displaySpaceSymbolPositions,
         displaySpaceSymbols,
         displaySpaceSymbolWraps,
+        editorBundleIDs,
         emojiPickerSkinTone,
         fullscreenIconStyle,
         hideEmptySpaces,
@@ -155,6 +180,7 @@ enum KeySpecs {
         invertVerticalScroll,
         localSpaceNumbers,
         paddingScale,
+        projectRoots,
         scrollHapticFeedback,
         scrollHapticIntensity,
         scrollSensitivity,
@@ -298,6 +324,21 @@ final class DefaultsStore {
 
     // MARK: - Property Accessors
 
+    var agentStatusIndicator: AgentIndicatorStyle {
+        get { self[KeySpecs.agentStatusIndicator] }
+        set { self[KeySpecs.agentStatusIndicator] = newValue }
+    }
+
+    var autoLabelFromProject: Bool {
+        get { self[KeySpecs.autoLabelFromProject] }
+        set { self[KeySpecs.autoLabelFromProject] = newValue }
+    }
+
+    var autoLabelTemplate: String {
+        get { self[KeySpecs.autoLabelTemplate] }
+        set { self[KeySpecs.autoLabelTemplate] = newValue }
+    }
+
     var clickToSwitchSpaces: Bool {
         get { self[KeySpecs.clickToSwitchSpaces] }
         set { self[KeySpecs.clickToSwitchSpaces] = newValue }
@@ -308,9 +349,23 @@ final class DefaultsStore {
         set { self[KeySpecs.dimInactiveSpaces] = newValue }
     }
 
+    var displayPresentations: [String: DisplayPresentation] {
+        get { self[KeySpecs.displayPresentations] }
+        set { self[KeySpecs.displayPresentations] = newValue }
+    }
+
     var displaySpaceBadges: [String: [Int: SpaceBadge]] {
         get { self[KeySpecs.displaySpaceBadges] }
         set { self[KeySpecs.displaySpaceBadges] = newValue }
+    }
+
+    /// How a display's Spaces render in the status bar; an unconfigured
+    /// display shows everything.
+    func presentation(forDisplay displayID: String?) -> DisplayPresentation {
+        guard let displayID else {
+            return .full
+        }
+        return displayPresentations[displayID] ?? .full
     }
 
     var displaySpaceColors: [String: [Int: SpaceColors]] {
@@ -363,6 +418,11 @@ final class DefaultsStore {
         set { self[KeySpecs.displaySpaceSymbolWraps] = newValue }
     }
 
+    var editorBundleIDs: [String] {
+        get { self[KeySpecs.editorBundleIDs] }
+        set { self[KeySpecs.editorBundleIDs] = newValue }
+    }
+
     var emojiPickerSkinTone: SkinTone {
         get { self[KeySpecs.emojiPickerSkinTone] }
         set { self[KeySpecs.emojiPickerSkinTone] = newValue }
@@ -411,6 +471,11 @@ final class DefaultsStore {
     var paddingScale: Double {
         get { self[KeySpecs.paddingScale] }
         set { self[KeySpecs.paddingScale] = newValue }
+    }
+
+    var projectRoots: [String] {
+        get { self[KeySpecs.projectRoots] }
+        set { self[KeySpecs.projectRoots] = newValue }
     }
 
     var scrollHapticFeedback: Bool {

@@ -29,6 +29,8 @@ final class StatusBarRenderer {
         let spaceID: Int
         let isActive: Bool
         let isFullscreen: Bool
+        /// How much of this display's styling reaches the status bar
+        let presentation: DisplayPresentation
     }
 
     /// Couples a resolved slot with the rendered icon so layout and drawing stay in sync.
@@ -49,6 +51,7 @@ final class StatusBarRenderer {
     /// (non-store) defaults changes are handled by AppDelegate's Defaults observer,
     /// which calls `invalidateIconCache()`.
     private struct IconCacheKey: Equatable {
+        let agentStates: [Int: AgentState]
         let allDisplaysSpaceInfo: [DisplaySpaceInfo]
         let allSpaceEntries: [SpaceEntry]
         let currentDisplayID: String?
@@ -56,6 +59,7 @@ final class StatusBarRenderer {
         let currentSpaceID: Int
         let fullscreenOwners: [Int: pid_t]
         let isDarkMode: Bool
+        let projects: [Int: SpaceProject]
         let spacesWithWindows: Set<Int>
         let storeMutationCount: Int
     }
@@ -274,6 +278,7 @@ final class StatusBarRenderer {
 
     private func buildIconCacheKey() -> IconCacheKey {
         IconCacheKey(
+            agentStates: appState.agentStatusStore.statesBySpace,
             allDisplaysSpaceInfo: appState.allDisplaysSpaceInfo,
             allSpaceEntries: appState.allSpaceEntries,
             currentDisplayID: appState.currentDisplayID,
@@ -281,6 +286,7 @@ final class StatusBarRenderer {
             currentSpaceID: appState.currentSpaceID,
             fullscreenOwners: fullscreenOwners(),
             isDarkMode: appState.darkModeEnabled,
+            projects: appState.projectIndex.projects,
             spacesWithWindows: cachedSpacesWithWindows,
             storeMutationCount: store.mutationCount
         )
@@ -342,7 +348,10 @@ final class StatusBarRenderer {
         let labels = fetchLabels(displayID: appState.currentDisplayID ?? "")
         let displayNumber = appState.currentSpaceDisplayNumber
         let rawLabel = labels[appState.currentSpace].flatMap { $0.isEmpty ? nil : $0 }
-        let label = rawLabel.map { LabelTemplate.resolve($0, space: displayNumber) }
+        let label = rawLabel.map {
+            resolveUserLabel($0, spaceID: appState.currentSpaceID, displayNumber: displayNumber)
+        }
+            ?? autoLabel(spaceID: appState.currentSpaceID, displayNumber: displayNumber)
             ?? appState.currentSpaceLabel
         return generateSingleIcon(
             for: appState.currentSpace,
@@ -350,12 +359,19 @@ final class StatusBarRenderer {
             displayNumber: displayNumber,
             label: label,
             labels: labels,
-            darkMode: darkMode
+            darkMode: darkMode,
+            presentation: renderedPresentation(forDisplay: appState.currentDisplayID)
         )
     }
 
     private func generateSingleIcon(
-        for space: Int, spaceID: Int, displayNumber: Int, label: String, labels: [Int: String], darkMode: Bool
+        for space: Int,
+        spaceID: Int,
+        displayNumber: Int,
+        label: String,
+        labels: [Int: String],
+        darkMode: Bool,
+        presentation: DisplayPresentation
     ) -> NSImage {
         generateIcon(
             forSpace: space,
@@ -364,7 +380,8 @@ final class StatusBarRenderer {
             label: label,
             labels: labels,
             displayID: appState.currentDisplayID,
-            darkMode: darkMode
+            darkMode: darkMode,
+            presentation: presentation
         )
     }
 
@@ -379,7 +396,8 @@ final class StatusBarRenderer {
                     displayNumber: slot.displayNumber,
                     label: slot.displayLabel,
                     labels: labels,
-                    darkMode: darkMode
+                    darkMode: darkMode,
+                    presentation: slot.presentation
                 )
             )
         }
@@ -398,7 +416,8 @@ final class StatusBarRenderer {
                         localIndex: slot.localIndex,
                         spaceID: slot.spaceID,
                         displayNumber: slot.displayNumber,
-                        darkMode: darkMode
+                        darkMode: darkMode,
+                        presentation: slot.presentation
                     )
                 )
             }
@@ -496,7 +515,8 @@ final class StatusBarRenderer {
         localIndex: Int,
         spaceID: Int,
         displayNumber: Int,
-        darkMode: Bool
+        darkMode: Bool,
+        presentation: DisplayPresentation
     ) -> NSImage {
         generateIcon(
             forSpace: localIndex,
@@ -505,7 +525,8 @@ final class StatusBarRenderer {
             label: label,
             labels: labels,
             displayID: displayID,
-            darkMode: darkMode
+            darkMode: darkMode,
+            presentation: presentation
         )
     }
 
@@ -529,6 +550,8 @@ final class StatusBarRenderer {
         let symbolWrap: SymbolWrap
         /// Gap between symbol and label in points at 100% scale
         let symbolGap: Double
+        /// Agent session state to overlay as a status dot, when enabled
+        let agentState: AgentState?
     }
 
     /// Shared icon generation: resolves preferences into an IconSpec, then
@@ -540,7 +563,8 @@ final class StatusBarRenderer {
         label: String,
         labels: [Int: String],
         displayID: String?,
-        darkMode: Bool
+        darkMode: Bool,
+        presentation: DisplayPresentation = .full
     ) -> NSImage {
         render(resolveIconSpec(
             forSpace: space,
@@ -549,7 +573,8 @@ final class StatusBarRenderer {
             label: label,
             labels: labels,
             displayID: displayID,
-            darkMode: darkMode
+            darkMode: darkMode,
+            presentation: presentation
         ))
     }
 
@@ -562,9 +587,39 @@ final class StatusBarRenderer {
         label: String,
         labels: [Int: String],
         displayID: String?,
-        darkMode: Bool
+        darkMode: Bool,
+        presentation: DisplayPresentation = .full
     ) -> IconSpec {
-        let hasCustomLabel = labels[space]?.isEmpty == false
+        // A numbers-only display drops every per-Space customization: the
+        // point is that its Spaces stop competing for attention with the
+        // display whose labels carry meaning. Full-screen Spaces keep their
+        // app icon, which identifies rather than labels.
+        // Agent status is orthogonal to presentation: a numbers-only display
+        // still shows whether its agent needs attention
+        let agentState = store.agentStatusIndicator == .off
+            ? nil
+            : appState.agentStatusStore.statesBySpace[spaceID]
+
+        if presentation == .numbers {
+            let isFullscreen = label == Labels.fullscreen
+            return IconSpec(
+                text: isFullscreen ? Labels.fullscreen : String(displayNumber),
+                colors: nil,
+                font: nil,
+                style: .square,
+                symbol: nil,
+                skinTone: .default,
+                badge: nil,
+                appIcon: isFullscreen ? fullscreenAppIcon(forSpaceID: spaceID) : nil,
+                darkMode: darkMode,
+                hasCustomLabel: false,
+                symbolPosition: .left,
+                symbolWrap: .inside,
+                symbolGap: Layout.maxSymbolGap * Layout.defaultSymbolGapScale / 100.0,
+                agentState: agentState
+            )
+        }
+
         let symbolPosition = SpacePreferences.symbolPosition(
             forSpace: space, display: displayID, store: store
         ) ?? .left
@@ -579,8 +634,12 @@ final class StatusBarRenderer {
         let colors = SpacePreferences.colors(forSpace: space, display: displayID, store: store)
         let style: IconStyle
         let font: NSFont?
+        // An auto-label styles like a user label (slim box, small bold font,
+        // symbol combining) so switching between the two is seamless
         let resolvedLabel = labels[space].flatMap { $0.isEmpty ? nil : $0 }
-            .map { LabelTemplate.resolve($0, space: displayNumber) }
+            .map { resolveUserLabel($0, spaceID: spaceID, displayNumber: displayNumber) }
+            ?? autoLabel(spaceID: spaceID, displayNumber: displayNumber)
+        let hasCustomLabel = resolvedLabel != nil
         if let resolvedLabel {
             let labelStyle = SpacePreferences.labelStyle(
                 forSpace: space, display: displayID, store: store
@@ -612,7 +671,8 @@ final class StatusBarRenderer {
                 hasCustomLabel: false,
                 symbolPosition: symbolPosition,
                 symbolWrap: symbolWrap,
-                symbolGap: symbolGap
+                symbolGap: symbolGap,
+                agentState: agentState
             )
         }
 
@@ -637,12 +697,51 @@ final class StatusBarRenderer {
             hasCustomLabel: hasCustomLabel,
             symbolPosition: symbolPosition,
             symbolWrap: symbolWrap,
-            symbolGap: symbolGap
+            symbolGap: symbolGap,
+            agentState: agentState
         )
     }
 
-    /// Draws a fully resolved spec, dispatching to SpaceIconGenerator.
+    /// Draws a fully resolved spec, dispatching to SpaceIconGenerator, and
+    /// overlays the agent status dot when one applies.
     private func render(_ spec: IconSpec) -> NSImage {
+        let base = renderBase(spec)
+        guard let agentState = spec.agentState else {
+            return base
+        }
+        return Self.overlayStatusDot(on: base, color: agentState.indicatorColor)
+    }
+
+    /// Composites a small status dot into the icon's top-right corner. Done
+    /// here rather than in SpaceIconGenerator so runtime agent state never
+    /// threads through the (preference-driven) icon drawing paths. The
+    /// contrasting ring keeps the dot legible on any user background color.
+    static func overlayStatusDot(on base: NSImage, color: NSColor) -> NSImage {
+        let dotDiameter = 6.0
+        let ringWidth = 1.0
+        let size = base.size
+        return NSImage(size: size, flipped: false) { rect in
+            base.draw(in: rect)
+            let dotRect = NSRect(
+                x: size.width - dotDiameter - ringWidth,
+                y: size.height - dotDiameter - ringWidth,
+                width: dotDiameter,
+                height: dotDiameter
+            )
+            let ringRect = dotRect.insetBy(dx: -ringWidth, dy: -ringWidth)
+            // Punch the ring out of the underlying icon so the dot separates
+            // from any background shape without assuming a bar color
+            NSGraphicsContext.current?.compositingOperation = .destinationOut
+            NSBezierPath(ovalIn: ringRect).fill()
+            NSGraphicsContext.current?.compositingOperation = .sourceOver
+            color.setFill()
+            NSBezierPath(ovalIn: dotRect).fill()
+            return true
+        }
+    }
+
+    /// Dispatches to the SpaceIconGenerator path the spec calls for.
+    private func renderBase(_ spec: IconSpec) -> NSImage {
         if let appIcon = spec.appIcon {
             return SpaceIconGenerator.generateAppIcon(
                 appIcon,
@@ -792,6 +891,15 @@ final class StatusBarRenderer {
         }
     }
 
+    /// The presentation to render a display with when it must be rendered
+    /// regardless of preference - the current display in single-icon mode has
+    /// nowhere to hide, so `.hidden` degrades to bare numbers instead of an
+    /// empty status item.
+    private func renderedPresentation(forDisplay displayID: String?) -> DisplayPresentation {
+        let presentation = store.presentation(forDisplay: displayID)
+        return presentation == .hidden ? .numbers : presentation
+    }
+
     /// Determines if a space should be shown based on filtering settings
     private func shouldShowSpace(label: String, spaceID: Int, nonEmptySpaceIDs: Set<Int>) -> Bool {
         // Hide full-screen applications if enabled
@@ -818,6 +926,9 @@ final class StatusBarRenderer {
         }
 
         let labels = fetchLabels(displayID: displayID)
+        // Every Space here belongs to the current display, so hiding it would
+        // leave nothing behind - degrade to numbers instead
+        let presentation = renderedPresentation(forDisplay: appState.currentDisplayID)
         var slots: [ResolvedSlot] = []
 
         for (arrayIndex, entry) in appState.allSpaceEntries.enumerated() {
@@ -838,7 +949,8 @@ final class StatusBarRenderer {
                 displayNumber: displayNumber,
                 localIndex: localIndex,
                 labels: labels,
-                isFullscreen: isFullscreen
+                isFullscreen: isFullscreen,
+                presentation: presentation
             )
 
             slots.append(ResolvedSlot(
@@ -849,7 +961,8 @@ final class StatusBarRenderer {
                 displayLabel: displayLabel,
                 spaceID: entry.id,
                 isActive: isActive,
-                isFullscreen: isFullscreen
+                isFullscreen: isFullscreen,
+                presentation: presentation
             ))
         }
 
@@ -870,6 +983,12 @@ final class StatusBarRenderer {
         var slotsPerDisplay: [[ResolvedSlot]] = []
 
         for displayInfo in appState.allDisplaysSpaceInfo {
+            let presentation = store.presentation(forDisplay: displayInfo.displayID)
+            // Unlike the current-display path, dropping a display here leaves
+            // the other displays' icons in place, so `.hidden` is honoured
+            guard presentation != .hidden else {
+                continue
+            }
             let labels = fetchLabels(displayID: displayInfo.displayID)
             var displaySlots: [ResolvedSlot] = []
             let isCurrentDisplay = displayInfo.displayID == appState.currentDisplayID
@@ -899,7 +1018,8 @@ final class StatusBarRenderer {
                     displayNumber: displayNumber,
                     localIndex: localIndex,
                     labels: labels,
-                    isFullscreen: isFullscreen
+                    isFullscreen: isFullscreen,
+                    presentation: presentation
                 )
 
                 displaySlots.append(ResolvedSlot(
@@ -910,7 +1030,8 @@ final class StatusBarRenderer {
                     displayLabel: displayLabel,
                     spaceID: entry.id,
                     isActive: isActive,
-                    isFullscreen: isFullscreen
+                    isFullscreen: isFullscreen,
+                    presentation: presentation
                 ))
             }
 
@@ -927,6 +1048,40 @@ final class StatusBarRenderer {
     static func globalIndex(entry: SpaceEntry, globalStartIndex: Int) -> Int {
         let localRegularIndex = entry.regularIndex ?? 0
         return globalStartIndex + max(localRegularIndex - 1, 0)
+    }
+
+    // MARK: - Project Labels
+
+    /// The template context for a Space: its number plus whatever project
+    /// and branch the index has resolved onto it.
+    private func labelContext(spaceID: Int, displayNumber: Int) -> LabelContext {
+        let project = appState.projectIndex.projects[spaceID]
+        return LabelContext(space: displayNumber, branch: project?.branch, project: project?.name)
+    }
+
+    /// The automatic label for a Space, or nil when auto-labelling is off,
+    /// no project resolved, or the template resolves to nothing (e.g.
+    /// `{ticket}` on a branch without an issue key).
+    private func autoLabel(spaceID: Int, displayNumber: Int) -> String? {
+        guard store.autoLabelFromProject,
+              appState.projectIndex.projects[spaceID] != nil
+        else {
+            return nil
+        }
+        let resolved = LabelTemplate.resolve(
+            store.autoLabelTemplate,
+            context: labelContext(spaceID: spaceID, displayNumber: displayNumber)
+        ).trimmingCharacters(in: .whitespaces)
+        return resolved.isEmpty ? nil : LabelTemplate.truncateResolved(resolved)
+    }
+
+    /// Resolves a user label with the full context and caps the result -
+    /// branch tokens can expand far past the authoring limit.
+    private func resolveUserLabel(_ label: String, spaceID: Int, displayNumber: Int) -> String {
+        LabelTemplate.truncateResolved(LabelTemplate.resolve(
+            label,
+            context: labelContext(spaceID: spaceID, displayNumber: displayNumber)
+        ))
     }
 
     /// Fetches all custom labels for a display in a single read.
@@ -970,13 +1125,22 @@ final class StatusBarRenderer {
         displayNumber: Int,
         localIndex: Int,
         labels: [Int: String],
-        isFullscreen: Bool
+        isFullscreen: Bool,
+        presentation: DisplayPresentation = .full
     ) -> String {
         if isFullscreen {
             return entry.label
         }
+        // Skip custom labels on a numbers-only display so the slot's label
+        // matches what actually gets drawn
+        if presentation == .numbers {
+            return String(displayNumber)
+        }
         if let label = labels[localIndex], !label.isEmpty {
-            return LabelTemplate.resolve(label, space: displayNumber)
+            return resolveUserLabel(label, spaceID: entry.id, displayNumber: displayNumber)
+        }
+        if let auto = autoLabel(spaceID: entry.id, displayNumber: displayNumber) {
+            return auto
         }
         return store.localSpaceNumbers ? entry.label : String(displayNumber)
     }

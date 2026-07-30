@@ -84,10 +84,11 @@ struct SpacesPane: View {
     private var displayPicker: some View {
         Picker(Localization.labelDisplays, selection: displayBinding) {
             ForEach(Array(model.displays.enumerated()), id: \.element.displayID) { index, display in
-                Text(String(index + 1)).tag(display.displayID as String?)
+                Text(model.displayName(for: display, position: index + 1))
+                    .tag(display.displayID as String?)
             }
         }
-        .pickerStyle(.segmented)
+        .pickerStyle(.menu)
         .labelsHidden()
     }
 

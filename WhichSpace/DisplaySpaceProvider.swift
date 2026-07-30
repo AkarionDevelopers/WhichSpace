@@ -1,5 +1,40 @@
 import Cocoa
 
+// MARK: - Display Names
+
+/// Resolves the CGS display identifiers used throughout the app to the names
+/// macOS shows for the same monitors ("PB248", "Built-in Retina Display").
+///
+/// CGS reports each display as the string form of its display UUID, which is
+/// exactly what `CGDisplayCreateUUIDFromDisplayID` produces for an `NSScreen`,
+/// so the two sides join on that value. Identifiers with no attached screen
+/// (a disconnected display still holding Spaces, or the `Main` fallback
+/// `SpaceSnapshotService` uses) fall back to a positional name.
+@MainActor
+enum DisplayNames {
+    /// The display's macOS name, or "Display N" using its 1-based position in
+    /// the caller's display list.
+    static func name(forDisplay displayID: String, position: Int) -> String {
+        screen(forDisplay: displayID)?.localizedName
+            ?? String(format: Localization.labelDisplayNumber, position)
+    }
+
+    private static func screen(forDisplay displayID: String) -> NSScreen? {
+        NSScreen.screens.first { uuid(for: $0) == displayID }
+    }
+
+    /// The display UUID string for a screen, matching the identifiers in
+    /// `CGSCopyManagedDisplaySpaces`.
+    static func uuid(for screen: NSScreen) -> String? {
+        guard let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber,
+              let uuid = CGDisplayCreateUUIDFromDisplayID(number.uint32Value)?.takeRetainedValue()
+        else {
+            return nil
+        }
+        return CFUUIDCreateString(nil, uuid) as String?
+    }
+}
+
 // MARK: - Display Space Provider Protocol
 
 /// Protocol for abstracting CGS display space functions for testability
@@ -9,6 +44,7 @@ protocol DisplaySpaceProvider: Sendable {
     func copyActiveMenuBarDisplayIdentifier() -> String?
     func fullscreenOwnerPIDs(forSpaceIDs spaceIDs: [Int]) -> [Int: pid_t]
     func spacesWithWindows(forSpaceIDs spaceIDs: [Int]) -> Set<Int>
+    func spaces(forWindowIDs windowIDs: [UInt32]) -> [UInt32: Int]
 }
 
 // MARK: - CGSDisplaySpaceProvider
@@ -79,6 +115,23 @@ struct CGSDisplaySpaceProvider: DisplaySpaceProvider {
 
         let spaceIDSet = Set(spaceIDs)
         return Set(spaces).intersection(spaceIDSet)
+    }
+
+    /// Maps each window to the Space it lives on, one CGS call per window so
+    /// the association survives (`SLSCopySpacesForWindows` flattens a batch
+    /// into an unordered union). Callers pass a handful of editor windows,
+    /// not the whole window list.
+    func spaces(forWindowIDs windowIDs: [UInt32]) -> [UInt32: Int] {
+        var result: [UInt32: Int] = [:]
+        for windowID in windowIDs {
+            guard let spaces = SLSCopySpacesForWindows(conn, 0x7, [windowID] as CFArray),
+                  let spaceID = (spaces.takeRetainedValue() as? [Int])?.first
+            else {
+                continue
+            }
+            result[windowID] = spaceID
+        }
+        return result
     }
 
     /// Maps each fullscreen space ID to the PID of the app whose window lives on it.

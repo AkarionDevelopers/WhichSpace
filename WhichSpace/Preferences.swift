@@ -38,6 +38,28 @@ enum FullscreenIconStyle: String, CaseIterable, Defaults.Serializable {
     case letter
 }
 
+// MARK: - DisplayPresentation
+
+/// How much of a display's per-Space styling reaches the status bar.
+///
+/// Multi-display setups often have one "work" display whose Spaces carry
+/// meaning and others that just hold a browser or chat window. Labels are
+/// keyed by Space index, so without this those secondary displays echo the
+/// work display's labels. String-backed with an absent key resolving to
+/// `.full`, so existing setups are unaffected.
+enum DisplayPresentation: String, CaseIterable, Defaults.Serializable {
+    /// Labels, symbols, badges, and colors - the normal rendering
+    case full
+    /// The plain Space number in the default style
+    case numbers
+    /// No icons at all for this display
+    case hidden
+
+    var localizedTitle: String {
+        NSLocalizedString("presentation_\(rawValue)", comment: "")
+    }
+}
+
 // MARK: - SpaceFont
 
 struct SpaceFont: Equatable, Defaults.Serializable {

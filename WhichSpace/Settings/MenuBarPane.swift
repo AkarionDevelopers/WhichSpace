@@ -29,7 +29,41 @@ struct MenuBarPane: View {
                 )
             }
             displaySection
+            perDisplaySection
             visibilitySection
+        }
+    }
+
+    /// One row per connected display, choosing how much of its Space styling
+    /// reaches the status bar. Pointless with a single display, so the whole
+    /// section stays hidden until a second one is attached.
+    @ViewBuilder
+    private var perDisplaySection: some View {
+        let displays = model.connectedDisplays
+        if displays.count > 1 {
+            SettingsSection(Localization.labelDisplays) {
+                ForEach(Array(displays.enumerated()), id: \.element.displayID) { index, display in
+                    if index > 0 {
+                        SettingsRowDivider()
+                    }
+                    SettingsRow(
+                        icon: "display",
+                        subtitle: index == 0 ? Localization.tipDisplayPresentation : nil
+                    ) {
+                        Text(display.name)
+                            .lineLimit(1)
+                    } control: {
+                        Picker(display.name, selection: model.presentationBinding(for: display.displayID)) {
+                            ForEach(DisplayPresentation.allCases, id: \.self) { presentation in
+                                Text(presentation.localizedTitle).tag(presentation)
+                            }
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                        .fixedSize()
+                    }
+                }
+            }
         }
     }
 
