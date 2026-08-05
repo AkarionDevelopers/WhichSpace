@@ -162,3 +162,98 @@ struct ProjectResolverTests {
         return url
     }
 }
+
+// MARK: - SpaceProjectIndex.merge
+
+/// The merge rules exist because the Accessibility API only reports windows
+/// on visible Spaces - a resolution pass never sees the whole picture.
+struct SpaceProjectIndexMergeTests {
+    private func project(space: Int, path: String, branch: String? = "main") -> SpaceProject {
+        let url = URL(fileURLWithPath: path)
+        return SpaceProject(spaceID: space, path: url, name: url.lastPathComponent, branch: branch)
+    }
+
+    @Test("background entries survive a pass that cannot see them")
+    func backgroundEntriesSurvive() {
+        let previous = [
+            4: project(space: 4, path: "/p/grc-cloud-2"),
+            5: project(space: 5, path: "/p/grc-cloud-3"),
+        ]
+        // Only Space 3 is visible; its window resolved
+        let fresh = [3: project(space: 3, path: "/p/grc-cloud")]
+
+        let merged = SpaceProjectIndex.merge(
+            previous: previous,
+            fresh: fresh,
+            allSpaceIDs: [3, 4, 5],
+            visibleSpaceIDs: [3],
+            branchReader: { _ in "main" }
+        )
+
+        #expect(merged.keys.sorted() == [3, 4, 5])
+    }
+
+    @Test("a closed Space's entry is pruned")
+    func closedSpacePruned() {
+        let previous = [9: project(space: 9, path: "/p/grc-cloud-2")]
+
+        let merged = SpaceProjectIndex.merge(
+            previous: previous,
+            fresh: [:],
+            allSpaceIDs: [3, 4],
+            visibleSpaceIDs: [3],
+            branchReader: { _ in nil }
+        )
+
+        #expect(merged.isEmpty)
+    }
+
+    @Test("a visible Space with no resolved window loses its entry")
+    func visibleUnresolvedPruned() {
+        // The window on Space 3 closed; AX can see that Space, so trust it
+        let previous = [3: project(space: 3, path: "/p/grc-cloud")]
+
+        let merged = SpaceProjectIndex.merge(
+            previous: previous,
+            fresh: [:],
+            allSpaceIDs: [3, 4],
+            visibleSpaceIDs: [3],
+            branchReader: { _ in nil }
+        )
+
+        #expect(merged.isEmpty)
+    }
+
+    @Test("a project that moved Spaces leaves its old Space")
+    func movedProjectDeduplicated() {
+        let previous = [4: project(space: 4, path: "/p/grc-cloud-2")]
+        // Same project now resolved on the visible Space 3
+        let fresh = [3: project(space: 3, path: "/p/grc-cloud-2")]
+
+        let merged = SpaceProjectIndex.merge(
+            previous: previous,
+            fresh: fresh,
+            allSpaceIDs: [3, 4],
+            visibleSpaceIDs: [3],
+            branchReader: { _ in nil }
+        )
+
+        #expect(merged.keys.sorted() == [3])
+        #expect(merged[3]?.path.path == "/p/grc-cloud-2")
+    }
+
+    @Test("retained entries follow branch switches")
+    func retainedEntriesRefreshBranch() {
+        let previous = [4: project(space: 4, path: "/p/grc-cloud-2", branch: "main")]
+
+        let merged = SpaceProjectIndex.merge(
+            previous: previous,
+            fresh: [:],
+            allSpaceIDs: [3, 4],
+            visibleSpaceIDs: [3],
+            branchReader: { _ in "task/DEV-9999/x" }
+        )
+
+        #expect(merged[4]?.branch == "task/DEV-9999/x")
+    }
+}

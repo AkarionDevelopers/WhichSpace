@@ -434,27 +434,48 @@ final class StatusBarRenderer {
 
         let totalWidth = renderedIcons.reduce(0) { $0 + $1.icon.size.width }
         let imageSize = NSSize(width: totalWidth, height: Layout.statusItemHeight)
-        let dimInactive = store.dimInactiveSpaces
+        let drawSlots = renderedIcons.map(resolvedDrawSlot)
         return Self.drawDeferred(size: imageSize) {
             var xOffset: Double = 0
-            for rendered in renderedIcons {
+            for slot in drawSlots {
                 let drawRect = NSRect(
                     x: xOffset,
                     y: 0,
-                    width: rendered.icon.size.width,
+                    width: slot.icon.size.width,
                     height: Layout.statusItemHeight
                 )
 
-                let alpha = rendered.slot.isActive || !dimInactive ? 1.0 : 0.35
-                rendered.icon.draw(
+                slot.icon.draw(
                     in: drawRect,
-                    from: NSRect(origin: .zero, size: rendered.icon.size),
+                    from: NSRect(origin: .zero, size: slot.icon.size),
                     operation: .sourceOver,
-                    fraction: alpha
+                    fraction: slot.alpha
                 )
-                xOffset += rendered.icon.size.width
+                if let redrawDotColor = slot.redrawDotColor {
+                    Self.drawStatusDot(in: drawRect, color: redrawDotColor)
+                }
+                xOffset += slot.icon.size.width
             }
         }
+    }
+
+    /// A slot reduced to the values the deferred drawing closure may capture.
+    /// `redrawDotColor` is set when the slot draws dimmed but carries an
+    /// agent status dot, which must be re-drawn at full opacity on top.
+    private struct DrawSlot {
+        let icon: NSImage
+        let alpha: Double
+        let redrawDotColor: NSColor?
+    }
+
+    private func resolvedDrawSlot(for rendered: RenderedSlotIcon) -> DrawSlot {
+        let alpha = rendered.slot.isActive || !store.dimInactiveSpaces ? 1.0 : 0.35
+        let redrawDotColor: NSColor? = if alpha < 1, store.agentStatusIndicator != .off {
+            appState.agentStatusStore.statesBySpace[rendered.slot.spaceID]?.indicatorColor
+        } else {
+            nil
+        }
+        return DrawSlot(icon: rendered.icon, alpha: alpha, redrawDotColor: redrawDotColor)
     }
 
     private func generateCrossDisplayIcon(darkMode: Bool) -> NSImage {
@@ -473,35 +494,37 @@ final class StatusBarRenderer {
         let totalWidth = totalSpacesWidth + Double(separatorCount) * Layout.displaySeparatorWidth
 
         let imageSize = NSSize(width: totalWidth, height: Layout.statusItemHeight)
-        let dimInactive = store.dimInactiveSpaces
         let separatorColor = store.separatorColor
             ?? IconColors.defaultSeparator(darkMode: darkMode)
+        let drawDisplays = renderedDisplays.map { $0.map(resolvedDrawSlot) }
         return Self.drawDeferred(size: imageSize) {
             var xOffset: Double = 0
 
-            for (displayIndex, displayIcons) in renderedDisplays.enumerated() {
+            for (displayIndex, displaySlots) in drawDisplays.enumerated() {
                 if displayIndex > 0 {
                     Self.drawDisplaySeparator(at: xOffset, color: separatorColor)
                     xOffset += Layout.displaySeparatorWidth
                 }
 
-                for rendered in displayIcons {
+                for slot in displaySlots {
                     let drawRect = NSRect(
                         x: xOffset,
                         y: 0,
-                        width: rendered.icon.size.width,
+                        width: slot.icon.size.width,
                         height: Layout.statusItemHeight
                     )
 
-                    let alpha = rendered.slot.isActive || !dimInactive ? 1.0 : 0.35
-                    rendered.icon.draw(
+                    slot.icon.draw(
                         in: drawRect,
-                        from: NSRect(origin: .zero, size: rendered.icon.size),
+                        from: NSRect(origin: .zero, size: slot.icon.size),
                         operation: .sourceOver,
-                        fraction: alpha
+                        fraction: slot.alpha
                     )
+                    if let redrawDotColor = slot.redrawDotColor {
+                        Self.drawStatusDot(in: drawRect, color: redrawDotColor)
+                    }
 
-                    xOffset += rendered.icon.size.width
+                    xOffset += slot.icon.size.width
                 }
             }
         }
@@ -717,27 +740,35 @@ final class StatusBarRenderer {
     /// threads through the (preference-driven) icon drawing paths. The
     /// contrasting ring keeps the dot legible on any user background color.
     static func overlayStatusDot(on base: NSImage, color: NSColor) -> NSImage {
-        let dotDiameter = 6.0
-        let ringWidth = 1.0
         let size = base.size
         return NSImage(size: size, flipped: false) { rect in
             base.draw(in: rect)
-            let dotRect = NSRect(
-                x: size.width - dotDiameter - ringWidth,
-                y: size.height - dotDiameter - ringWidth,
-                width: dotDiameter,
-                height: dotDiameter
-            )
-            let ringRect = dotRect.insetBy(dx: -ringWidth, dy: -ringWidth)
-            // Punch the ring out of the underlying icon so the dot separates
-            // from any background shape without assuming a bar color
-            NSGraphicsContext.current?.compositingOperation = .destinationOut
-            NSBezierPath(ovalIn: ringRect).fill()
-            NSGraphicsContext.current?.compositingOperation = .sourceOver
-            color.setFill()
-            NSBezierPath(ovalIn: dotRect).fill()
+            drawStatusDot(in: rect, color: color)
             return true
         }
+    }
+
+    /// Draws the status dot into a slot's frame in the current context.
+    /// Shared by the single-icon overlay and the multi-icon compositors,
+    /// which re-draw the dot at full opacity after dimming an inactive slot -
+    /// the dot reports background Spaces, so it must never fade with them.
+    static func drawStatusDot(in frame: NSRect, color: NSColor) {
+        let dotDiameter = 6.0
+        let ringWidth = 1.0
+        let dotRect = NSRect(
+            x: frame.maxX - dotDiameter - ringWidth,
+            y: frame.maxY - dotDiameter - ringWidth,
+            width: dotDiameter,
+            height: dotDiameter
+        )
+        let ringRect = dotRect.insetBy(dx: -ringWidth, dy: -ringWidth)
+        // Punch the ring out of the underlying icon so the dot separates
+        // from any background shape without assuming a bar color
+        NSGraphicsContext.current?.compositingOperation = .destinationOut
+        NSBezierPath(ovalIn: ringRect).fill()
+        NSGraphicsContext.current?.compositingOperation = .sourceOver
+        color.setFill()
+        NSBezierPath(ovalIn: dotRect).fill()
     }
 
     /// Dispatches to the SpaceIconGenerator path the spec calls for.

@@ -190,34 +190,54 @@ final class SpaceProjectIndex {
         let displaySpaceProvider = displaySpaceProvider
         let bundleIDs = store.editorBundleIDs
         let projectRoots = store.projectRoots.map { URL(fileURLWithPath: ($0 as NSString).expandingTildeInPath) }
+        let previous = projects
 
         // The AX walk, CGS queries, and disk reads all happen off the main
         // actor; only the final dictionary swap comes back
         let resolved = await Task.detached(priority: .utility) { () -> [Int: SpaceProject] in
-            let windows = editorWindowProvider.editorWindows(bundleIDs: bundleIDs)
-            guard !windows.isEmpty else {
-                return [:]
+            // Topology: which Spaces still exist, and which are visible
+            // (the active Space of each display)
+            var allSpaceIDs = Set<Int>()
+            var visibleSpaceIDs = Set<Int>()
+            for display in displaySpaceProvider.copyManagedDisplaySpaces() ?? [] {
+                for space in display["Spaces"] as? [[String: Any]] ?? [] {
+                    if let spaceID = space["ManagedSpaceID"] as? Int {
+                        allSpaceIDs.insert(spaceID)
+                    }
+                }
+                if let current = (display["Current Space"] as? [String: Any])?["ManagedSpaceID"] as? Int {
+                    visibleSpaceIDs.insert(current)
+                }
             }
-            let spacesByWindow = displaySpaceProvider.spaces(forWindowIDs: windows.map(\.windowID))
+
+            let windows = editorWindowProvider.editorWindows(bundleIDs: bundleIDs)
+            let spacesByWindow = windows.isEmpty
+                ? [:]
+                : displaySpaceProvider.spaces(forWindowIDs: windows.map(\.windowID))
             let knownProjects = ProjectResolver.knownProjects(projectRoots: projectRoots)
 
-            var result: [Int: SpaceProject] = [:]
+            var fresh: [Int: SpaceProject] = [:]
             for window in windows {
                 guard let spaceID = spacesByWindow[window.windowID],
                       let folder = ProjectResolver.project(forTitle: window.title, in: knownProjects),
                       // First window wins: front-most editor per Space
-                      result[spaceID] == nil
+                      fresh[spaceID] == nil
                 else {
                     continue
                 }
-                result[spaceID] = SpaceProject(
+                fresh[spaceID] = SpaceProject(
                     spaceID: spaceID,
                     path: folder,
                     name: folder.lastPathComponent,
                     branch: GitBranch.branch(forRepository: folder)
                 )
             }
-            return result
+            return Self.merge(
+                previous: previous,
+                fresh: fresh,
+                allSpaceIDs: allSpaceIDs,
+                visibleSpaceIDs: visibleSpaceIDs
+            )
         }.value
 
         guard started else {
@@ -228,6 +248,50 @@ final class SpaceProjectIndex {
             projects = resolved
             onProjectsChanged?()
         }
+    }
+
+    /// Folds one resolution pass into the previous mapping.
+    ///
+    /// The Accessibility API only reports windows on the currently visible
+    /// Spaces, so a pass never sees the whole picture - replacing the map
+    /// outright would forget every background Space the moment the user
+    /// switches away (and with it the agent dots those Spaces exist to show).
+    /// Instead, background entries persist until there is positive evidence
+    /// they are gone:
+    /// - the Space itself closed (not in `allSpaceIDs`)
+    /// - the Space is visible, so AX *can* see its windows, and no project
+    ///   resolved on it
+    /// - the project resolved onto a different Space (the window moved)
+    ///
+    /// Retained entries re-read their branch so a background `git switch`
+    /// still updates the label.
+    nonisolated static func merge(
+        previous: [Int: SpaceProject],
+        fresh: [Int: SpaceProject],
+        allSpaceIDs: Set<Int>,
+        visibleSpaceIDs: Set<Int>,
+        branchReader: (URL) -> String? = { GitBranch.branch(forRepository: $0) }
+    ) -> [Int: SpaceProject] {
+        let freshPaths = Set(fresh.values.map(\.path))
+        var merged: [Int: SpaceProject] = [:]
+        for (spaceID, project) in previous {
+            guard allSpaceIDs.contains(spaceID),
+                  !visibleSpaceIDs.contains(spaceID),
+                  !freshPaths.contains(project.path)
+            else {
+                continue
+            }
+            merged[spaceID] = SpaceProject(
+                spaceID: project.spaceID,
+                path: project.path,
+                name: project.name,
+                branch: branchReader(project.path)
+            )
+        }
+        for (spaceID, project) in fresh {
+            merged[spaceID] = project
+        }
+        return merged
     }
 
     /// Keeps one git-directory watcher alive per resolved project, so a
